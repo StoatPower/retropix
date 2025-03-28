@@ -21,7 +21,7 @@ void ArducamLink::arducamUartBegin(uint32_t baudRate)
 void ArducamLink::reportVerInfo(Arducam_Mega* camera)
 {
   ArducamCamera* cameraInstance = camera->getCameraInstance();
-  uint8_t headAndTail[] = {0xff, 0xaa, 0x03, 0xff, 0xbb};
+  uint8_t headAndTail[] = {0xFF, 0xAA, 0x03, 0xFF, 0xBB};
 
   uint32_t len = 6;
   arducamUartWriteBuff(&headAndTail[0], 3);
@@ -85,7 +85,7 @@ void ArducamLink::cameraGetPicture(Arducam_Mega* camera)
     arducamUartWriteBuff(&headAndTail[3], 2);
 }
 
-void ArducamLink::send_data_pack(char cmd_type, char* msg)
+void ArducamLink::sendDataPack(char cmd_type, char* msg)
 {
     uint8_t headAndTail[] = {0xff, 0xaa, 0x07, 0xff, 0xbb};
     headAndTail[2] = cmd_type;
@@ -108,12 +108,12 @@ uint8_t ArducamLink::uartCommandProcessing(Arducam_Mega* camera, uint8_t* comman
     uint32_t exposureLen3 = 0;
 
     uint8_t cameraResolution = cameraInstance->currentPictureMode;
-    uint8_t cameraFarmat = cameraInstance->currentPixelFormat;
+    uint8_t cameraFormat = cameraInstance->currentPixelFormat;
     switch (commandBuff[0]) {
     case SET_PICTURE_RESOLUTION: // Set Camera Resolution
         cameraResolution = commandBuff[1] & 0x0f;
-        cameraFarmat = (commandBuff[1] & 0x70) >> 4;
-        camera->takePicture((CAM_IMAGE_MODE)cameraResolution, (CAM_IMAGE_PIX_FMT)cameraFarmat);
+        cameraFormat = (commandBuff[1] & 0x70) >> 4;
+        camera->takePicture((CAM_IMAGE_MODE)cameraResolution, (CAM_IMAGE_PIX_FMT)cameraFormat);
         break;
     case SET_VIDEO_RESOLUTION: // Set Video Resolution
         cameraResolution = commandBuff[1] & 0x0f;
@@ -171,7 +171,7 @@ uint8_t ArducamLink::uartCommandProcessing(Arducam_Mega* camera, uint8_t* comman
         reportCameraInfo(camera);
         break;
     case TAKE_PICTURE:
-        camera->takePicture((CAM_IMAGE_MODE)cameraResolution, (CAM_IMAGE_PIX_FMT)cameraFarmat);
+        camera->takePicture((CAM_IMAGE_MODE)cameraResolution, (CAM_IMAGE_PIX_FMT)cameraFormat);
         cameraGetPicture(camera);
         break;
     case DEBUG_WRITE_REGISTER:

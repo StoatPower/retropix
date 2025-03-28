@@ -51,7 +51,7 @@ class ArducamLink
     void reportSdkVerInfo(Arducam_Mega* camera);
     void cameraGetPicture(Arducam_Mega*);
     void arducamFlush(void);
-    void send_data_pack(char cmd_type, char* msg);
+    void sendDataPack(char cmd_type, char* msg);
 
   public:
     void printf(char* buff);
