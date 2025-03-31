@@ -6,7 +6,7 @@
 #define SerialWrite(ch)             Serial.write(ch)
 #define SerialWriteBuff(buf, len)   Serial.write(buf, len)
 #define SerialPrintf(str)           Serial.print(str)
-#define SerialAvailable()           Seiral.available()
+#define SerialAvailable()           Serial.available()
 #define SerialRead()                Serial.read()
-#define dalayUs(us)                 delayMicroseconds(us)
+#define delayUs(us)                 delayMicroseconds(us)
 #endif

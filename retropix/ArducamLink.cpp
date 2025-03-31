@@ -27,7 +27,7 @@ void ArducamLink::reportVerInfo(Arducam_Mega* camera)
   arducamUartWriteBuff(&headAndTail[0], 3);
   arducamUartWriteBuff((uint8_t*)&len, 4);
   arducamUartWriteBuff(cameraInstance->verDateAndNumber, 4);
-  printf("\r\n";);
+  printf("\r\n");
   arducamUartWriteBuff(&headAndTail[3], 2);
 }
 
@@ -126,7 +126,7 @@ uint8_t ArducamLink::uartCommandProcessing(Arducam_Mega* camera, uint8_t* comman
         camera->setBrightness((CAM_BRIGHTNESS_LEVEL)commandBuff[1]);
         break;
     case SET_CONTRAST: // Set Contrast
-        myCAM->setContrast((CAM_CONTRAST_LEVEL)commandBuff[1]);
+        camera->setContrast((CAM_CONTRAST_LEVEL)commandBuff[1]);
         break;
     case SET_SATURATION: // Set saturation
         camera->setSaturation((CAM_STAURATION_LEVEL)commandBuff[1]);

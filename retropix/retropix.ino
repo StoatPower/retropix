@@ -16,12 +16,14 @@ const int CS = 7;
 Arducam_Mega mega(CS);
 ArducamLink uart;
 
+uint8_t current_byte = 0;
+
 uint8_t cmdBuffer[20] = {0};
 uint8_t cmdLength = 0;
 
 uint8_t sendFlag = TRUE; // marks completion of data transmission
 uint32_t readImageLength = 0; // byte counter for image length
-uint8_t = jpegHeadFlag = 0; // flags if image transmission is underway
+uint8_t jpegHeadFlag = 0; // flags if image transmission is underway
 
 // Reads image data from the Arducam buffer and sends it over UART
 // `imagebuf` -> pointer to the image data buffer in the cameras internal memory
@@ -115,18 +117,18 @@ void setup() {
   // readBuffer = BUFFER_CALLBACK function
   // 200 = uint8_t blockSize (transmission length?)
   // WARNING - transmission length should be less than 255
-  mega.registerCallback(readBuffer, 200, handleStop);
+  mega.registerCallBack(readBuffer, 200, handleStop);
 }
 
 void loop() {
   // Checks the number of bytes (chars) available for reading from the serial port.
   // This is data that's already arrived and stored in the serial receive buffer (which holds 64 bytes)
   if (uart.arducamUartAvailable()) {
-    temp = uart.arducamUartRead(); // reads one byte from UART
+    current_byte = uart.arducamUartRead(); // reads one byte from UART
     delay(5); // delay for 5ms to allow more bytes to arrive in UART buffer
 
     // 0x55 signals the start of a command to send to the camera, so if we read one    
-    if (temp == 0x55) {
+    if (current_byte == 0x55) {
       // while there are still bytes to be read from the serial port...
       while (uart.arducamUartAvailable()) {
         // read the next byte and store it in the command buffer at the proper index (cmdLength)

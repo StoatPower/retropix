@@ -56,7 +56,7 @@ class ArducamLink
   public:
     void printf(char* buff);
     void arducamUartWrite(uint8_t);
-    void arducamUartWriteBuff(uint8_t*, unit16_t);
+    void arducamUartWriteBuff(uint8_t*, uint16_t);
     uint32_t arducamUartAvailable(void);
     uint8_t arducamUartRead(void);
 };
