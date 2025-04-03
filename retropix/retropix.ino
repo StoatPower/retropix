@@ -6,12 +6,20 @@
 // Github Source: https://github.com/ArduCAM/Arducam_Mega
 // Arducam Header File: https://github.com/ArduCAM/Arducam_Mega/blob/main/src/Arducam/ArducamCamera.h
 
+// PhotoDiode BPW34 Reference Links::
+// Tutorial: https://deepbluembedded.com/arduino-photodiode-light-sensor-bpw34-circuit-code-example/
+// 
+
 // Arduino Reference Links::
 // Serial UART port: https://docs.arduino.cc/language-reference/en/functions/communication/serial
+// Software Serial UART: https://docs.arduino.cc/learn/built-in-libraries/software-serial/
+// AltSoftSerial (If necessary): https://www.pjrc.com/teensy/td_libs_AltSoftSerial.html
 
 #include "ArducamLink.h"
 #include "Arducam_Mega.h"
+// #include "SoftwareSerial.h"
 
+// Arducam Mega declarations
 const int CS = 7;
 Arducam_Mega mega(CS);
 ArducamLink uart;
@@ -24,6 +32,11 @@ uint8_t cmdLength = 0;
 uint8_t sendFlag = TRUE; // marks completion of data transmission
 uint32_t readImageLength = 0; // byte counter for image length
 uint8_t jpegHeadFlag = 0; // flags if image transmission is underway
+
+// Message for Photodiode Reading
+char photodiodeBuffer[12];
+char photodiodeMessage[50];
+
 
 // Reads image data from the Arducam buffer and sends it over UART
 // `imagebuf` -> pointer to the image data buffer in the cameras internal memory
@@ -108,16 +121,25 @@ void handleStop() {
 }
 
 void setup() {
+  //// Arducam Mega setup
   // Initialize serial communication, i.e. - communicate via USB to host PC
   // Note: UART is unnecessary for production mode and should be disabled  
   uart.arducamUartBegin(921600);
+  uart.sendDataPack(7, "Hello Arduino UNO!");
   // Initialize camera configuration, defaulting to JPEG data format at maximum resolution
   mega.begin();
+  uart.sendDataPack(8, "Mega started!");
   // Register callback function for streaming mode (not sure if we need this)
   // readBuffer = BUFFER_CALLBACK function
   // 200 = uint8_t blockSize (transmission length?)
   // WARNING - transmission length should be less than 255
   mega.registerCallBack(readBuffer, 200, handleStop);
+
+  //// Debugging SoftwareSerial setup
+  // pinMode(rxPin, INPUT);
+  // pinMode(txPin, OUTPUT);
+  // debugSerial.begin(9600);
+  // debugSerial.println("Debug SoftwareSerial Initialized.");
 }
 
 void loop() {
@@ -152,4 +174,17 @@ void loop() {
   // i.e. - this ensures the `readBuffer` callback can be run when the camera is ready
   // to send data back after capturing
   mega.captureThread();
+
+  // Photodiode Debugging (Every 500ms)
+  static unsigned long lastRead = 0;
+  if (millis() - lastRead > 500) {
+    lastRead = millis();
+
+    int sensorValue = analogRead(A0); // read photodiode
+    // float voltage = sensorValue * (5.0 / 1023.0);
+    // dtostrf(voltage, 8, 4, photodiodeBuffer);
+    // sprintf(photodiodeMessage, "Photodiode Voltage: %s", photodiodeBuffer);
+    sprintf(photodiodeMessage, "Photodiode Voltage: %d", sensorValue*10);
+    uart.sendDataPack(9, photodiodeMessage);
+  }
 }
