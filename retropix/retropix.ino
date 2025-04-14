@@ -21,30 +21,51 @@
 #include "ArducamLink.h"
 #include "Arducam_Mega.h"
 #include <SD.h>
-// #include "SoftwareSerial.h"
+
+// Baud Rates
+#define VID_BAUD 921600
+#define IMG_BAUD 115200
+
+// Start/End of Image Codes
+#define SOI_1 0xFF
+#define SOI_2 0xD8
+#define EOI_1 0xFF
+#define EOI_2 0xD9
+
+#define UART_HEADER 0xFF
+#define OUT_START_CMD 0xAA
+#define OUT_STOP_CMD 0xBB
+#define OUT_CMD_IMG_TRANSFER 0x01
+#define OUT_CMD_MEGA_INFO 0x02
+#define OUT_CMD_STREAM_OFF 0x06
+#define IN_START_CMD 0x55
+#define IN_STOP_CMD 0xAA
 
 // Buffer size for storing chunks of image data before writing to SD 
-#define BUFFER_SIZE 0xFF    // 0xFF = 255 bytes
+#define IMG_BUFFER_SIZE 0xFF    // 0xFF = 255 bytes
 
 // SD Card declarations
-const int SD_CS = 10;        // chip select pin for SD card
+const int SD_CS = 10;       // chip select pin for SD card
 uint8_t img_count = 0;      // image file counter (i.e., 0.jpg, 1.jpg, ...)
-char img_name[10] = {0};            // buffer to hold generated filenames
-File out_file;               // File object for the SD card
+char img_name[10] = {0};    // buffer to hold generated filenames
+File out_file;              // File object for the SD card
+uint8_t current_img_byte = 0;
+uint8_t next_img_byte = 0;
+uint8_t jpg_head_flag = 0;  // flags if image transmission is underway
+unsigned int img_buffer_idx = 0;
+uint8_t img_buffer[IMG_BUFFER_SIZE] = {0};
 
 // Arducam Mega declarations
 const int MEGA_CS = 7;      // chip select pin for Arducam
 Arducam_Mega mega(MEGA_CS); // initialize camera using chip select pin
 ArducamLink uart;
 
-uint8_t current_byte = 0;
-
+uint8_t current_cmd_byte = 0;
 uint8_t cmd_buffer[20] = {0};
 uint8_t cmd_length = 0;
 
 uint8_t send_flag = TRUE; // marks completion of data transmission
 uint32_t read_img_length = 0; // byte counter for image length
-uint8_t jpg_head_flag = 0; // flags if image transmission is underway
 
 // Photodiode Declarations
 char pd_message[50];                // debug message for photodiode readings
@@ -54,24 +75,23 @@ uint8_t pd_threshold_counter = 0;   // counter for threshold
 const int pd_interval_ms = 500;     // interval in ms for taking readings from photodiode
 unsigned long pd_last_read = 0;     // keeps track of when the last photodiode reading was taken
 
-
 // Reads image data from the Arducam buffer and sends it over UART
 // `imagebuf` -> pointer to the image data buffer in the cameras internal memory
 // `length` -> the number of bytes to read in this function call
 // return `send_flag` -> transmission status
-uint8_t readBuffer(uint8_t* imagebuf, uint8_t length) {
+uint8_t uartReadBuffer(uint8_t* imagebuf, uint8_t length) {
   // JPEG images always start with the Start of Image (SOI) marker which is `0xFF 0xD8`
   // This checks whether the first two bytes of the image buffer `imagebuf[]` match the SOI marker
-  if (imagebuf[0] == 0xFF && imagebuf[1] == 0xD8) {
+  if (imagebuf[0] == SOI_1 && imagebuf[1] == SOI_2) {
     jpg_head_flag = 1;       // flags image transmission underway ?
     read_img_length = 0;    // reset byte counter for how much data sent
     // Send special header to Host Serial interface to signal that an image is to be transferred from Arduino
     // I'm not sure what the 0xFF does yet, it might just flush the buffer:
     // 0xAA -> starts transmission
     // 0x01 -> `cmdtype` that has a `payloadlength` and `payload` signifying "image length" and "image date" respectively
-    uart.arducamUartWrite(0xFF); 
-    uart.arducamUartWrite(0xAA); 
-    uart.arducamUartWrite(0x01);
+    uart.arducamUartWrite(UART_HEADER); 
+    uart.arducamUartWrite(OUT_START_CMD); 
+    uart.arducamUartWrite(OUT_CMD_IMG_TRANSFER);
 
     // Send image size (4 bytes, little-endian order)
     // Get first (right-most/least-significant bit) byte of picture length: bitwise AND (mask) with 0xFF i.e. 0b11111111 
@@ -110,31 +130,31 @@ uint8_t readBuffer(uint8_t* imagebuf, uint8_t length) {
     // Send the STOP code of 0xFFBB (or 0x55BB?)
     // NOTE: It appears this code uses 0xFF to begin communication from the camera to the host
     // but the documentation of the communication protocol uses 0x55. Keep this in mind and test both.
-    uart.arducamUartWrite(0xFF);
-    uart.arducamUartWrite(0xBB);
+    uart.arducamUartWrite(UART_HEADER);
+    uart.arducamUartWrite(OUT_STOP_CMD);
   }
   return send_flag;
 }
 
-void handleStop() {
+void handleUartReadStop() {
   read_img_length = 0;
   jpg_head_flag = 0;
   uint32_t streamoffLength = 9;
 
   // STOP code
-  uart.arducamUartWrite(0xFF);
-  uart.arducamUartWrite(0xBB);
+  uart.arducamUartWrite(UART_HEADER);
+  uart.arducamUartWrite(OUT_STOP_CMD);
 
   // START new transfer of "streamoff" command
-  uart.arducamUartWrite(0xFF);
-  uart.arducamUartWrite(0xAA);
-  uart.arducamUartWrite(0x06); // "streamoff" command
+  uart.arducamUartWrite(UART_HEADER);
+  uart.arducamUartWrite(OUT_START_CMD);
+  uart.arducamUartWrite(OUT_CMD_STREAM_OFF); // "streamoff" command
   uart.arducamUartWriteBuff((uint8_t*)&streamoffLength, 4); // send as 4 bytes 0x09000000 (see docs)
   uart.printf("streamoff"); // print "streamoff"
 
-  // STOP CODE
-  uart.arducamUartWrite(0xFF);
-  uart.arducamUartWrite(0xBB);
+  // STOP code
+  uart.arducamUartWrite(UART_HEADER);
+  uart.arducamUartWrite(OUT_STOP_CMD);
 }
 
 void setup() {
@@ -143,16 +163,16 @@ void setup() {
   //// Arducam Mega setup
   // Initialize serial communication, i.e. - communicate via USB to host PC
   // Note: UART is unnecessary for production mode and should be disabled  
-  uart.arducamUartBegin(921600);
+  uart.arducamUartBegin(IMG_BAUD);
   uart.sendDataPack(7, "Hello Arduino UNO!");
   // Initialize camera configuration, defaulting to JPEG data format at maximum resolution
   mega.begin();
   uart.sendDataPack(8, "Mega started!");
   // Register callback function for streaming mode (not sure if we need this)
-  // readBuffer = BUFFER_CALLBACK function
+  // uartReadBuffer = BUFFER_CALLBACK function
   // 200 = uint8_t blockSize (transmission length?)
   // WARNING - transmission length should be less than 255
-  mega.registerCallBack(readBuffer, 200, handleStop);
+  mega.registerCallBack(uartReadBuffer, 200, handleUartReadStop);
 
   // initialize the SD Card
   while (!SD.begin(SD_CS)) {
@@ -160,30 +180,24 @@ void setup() {
     // delay 1000??
   }
   uart.sendDataPack(10, "SD Card detected.");
-
-  //// Debugging SoftwareSerial setup
-  // pinMode(rxPin, INPUT);
-  // pinMode(txPin, OUTPUT);
-  // debugSerial.begin(9600);
-  // debugSerial.println("Debug SoftwareSerial Initialized.");
 }
 
 void loop() {
   // Checks the number of bytes (chars) available for reading from the serial port.
   // This is data that's already arrived and stored in the serial receive buffer (which holds 64 bytes)
   if (uart.arducamUartAvailable()) {
-    current_byte = uart.arducamUartRead(); // reads one byte from UART
+    current_cmd_byte = uart.arducamUartRead(); // reads one byte from UART
     delay(5); // delay for 5ms to allow more bytes to arrive in UART buffer
 
     // 0x55 signals the start of a command to send to the camera, so if we read one    
-    if (current_byte == 0x55) {
+    if (current_cmd_byte == IN_START_CMD) {
       // while there are still bytes to be read from the serial port...
       while (uart.arducamUartAvailable()) {
         // read the next byte and store it in the command buffer at the proper index (cmd_length)
         cmd_buffer[cmd_length] = uart.arducamUartRead();
         // If we read 0xAA, we need to stop break to process the command
         // There will be specific commands and parameters between 0x55 and 0xAA (see communication protocol docs)
-        if (cmd_buffer[cmd_length] == 0xAA) {
+        if (cmd_buffer[cmd_length] == IN_STOP_CMD) {
           break;
         }
         cmd_length++; // if we haven't read a 0xAA (stop) yet, increase the command buffer index and keep reading
@@ -197,7 +211,7 @@ void loop() {
     }
   }
   // run the camera's stream processing thread so it can capture images/video/data
-  // i.e. - this ensures the `readBuffer` callback can be run when the camera is ready
+  // i.e. - this ensures the `uartReadBuffer` callback can be run when the camera is ready
   // to send data back after capturing
   mega.captureThread();
 
@@ -229,22 +243,55 @@ void loop() {
       is_taking_picture = true;      
       uart.sendDataPack(12, "Start taking picture...");
     }
-  } else {      
-      if (millis() - pd_last_read > pd_interval_ms) {
-        pd_last_read = millis();
-        int pd_value = analogRead(A0); // read photodiode raw output
-        
-        // debugging message
-        // sprintf(pd_message, "Photodiode Voltage: %d", pd_value);
-        // uart.sendDataPack(11, pd_message);
-        
-        if (pd_value > 0) {
-          pd_threshold_counter = 0;
-          uart.sendDataPack(11, "Photograph Done!");
-          is_taking_picture = false;
-        } else {
-          uart.sendDataPack(12, "Smile! You're on candid camera!");
+  } else {
+    // CAM_IMAGE_MODE_QVGA is 320x240
+    mega.takePicture(CAM_IMAGE_MODE_QVGA, CAM_IMAGE_PIX_FMT_JPG);
+    while (mega.getReceivedLength()) {
+      current_img_byte = next_img_byte;
+      next_img_byte = mega.readByte();
+      if (jpg_head_flag == 1) {
+        img_buffer[img_buffer_idx++] = next_img_byte;
+        if (img_buffer_idx >= IMG_BUFFER_SIZE) {
+          out_file.write(img_buffer, img_buffer_idx);
+          img_buffer_idx = 0;
         }
       }
+      if (current_img_byte == SOI_1 && next_img_byte == SOI_2) {
+        jpg_head_flag = 1;
+        sprintf(img_name, "%d.jpg", img_count);
+        img_count++;
+        out_file = SD.open(img_name, FILE_WRITE|FILE_READ);
+        if (!out_file) {
+          Serial.println(F("File open failed."));
+          while (1);
+        }
+        img_buffer[img_buffer_idx++] = current_img_byte;
+        img_buffer[img_buffer_idx++] = next_img_byte;
+      }
+      if (current_img_byte == EOI_1 && next_img_byte == EOI_2) {
+        jpg_head_flag = 0;
+        out_file.write(img_buffer, img_buffer_idx);
+        img_buffer_idx = 0;
+        out_file.close();
+        Serial.println(F("Image save succeeded."));
+        break;
+      }
+    }
+    if (millis() - pd_last_read > pd_interval_ms) {
+      pd_last_read = millis();
+      int pd_value = analogRead(A0); // read photodiode raw output
+      
+      // debugging message
+      // sprintf(pd_message, "Photodiode Voltage: %d", pd_value);
+      // uart.sendDataPack(11, pd_message);
+      
+      if (pd_value > 0) {
+        pd_threshold_counter = 0;
+        uart.sendDataPack(11, "Photograph Done!");
+        is_taking_picture = false;
+      } else {
+        uart.sendDataPack(12, "Smile! You're on candid camera!");
+      }
+    }
   }  
 }
