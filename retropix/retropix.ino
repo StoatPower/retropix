@@ -18,7 +18,6 @@
 // Software Serial UART: https://docs.arduino.cc/learn/built-in-libraries/software-serial/
 // AltSoftSerial (If necessary): https://www.pjrc.com/teensy/td_libs_AltSoftSerial.html
 
-#include "ArducamLink.h"
 #include "Arducam_Mega.h"
 #include <SD.h>
 
@@ -65,7 +64,6 @@ uint8_t img_buffer[IMG_BUFFER_SIZE] = {0};
 // Arducam Mega declarations
 const int MEGA_CS = 7;      // chip select pin for Arducam
 Arducam_Mega mega(MEGA_CS); // initialize camera using chip select pin
-ArducamLink uart;
 
 // Photodiode Declarations
 char pd_message[50];                // debug message for photodiode readings
