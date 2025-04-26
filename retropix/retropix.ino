@@ -133,18 +133,10 @@ void setup() {
  * return `void`
  */
 void loop() {
-  // int pd_value = analogRead(A0);
-  // sprintf(pd_message, "Photodiode Reading: %d", pd_value);
-  // log(pd_message, DEBUG_INFO);
-  // delay(500);
-
   if (!is_taking_picture) {
     handleAmbientLightDetection();
   } else if (is_taking_picture && !picture_saved) {
-    takeAndSavePicture();    
-    // log(F("faking picture save"), DEBUG_INFO);
-    // delay(1000);
-    // picture_saved = true;
+    takeAndSavePicture();
   } else {
     awaitShutterClose();
   }  
