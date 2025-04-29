@@ -103,15 +103,20 @@ void setup() {
   // Arducam Mega setup
   log(F("Hello Arduino UNO!"), DEBUG_INFO);
   // Initialize camera configuration, defaulting to JPEG data format at maximum resolution
-  mega.begin();
-  log(F("Mega started!"), DEBUG_INFO);
+  CamStatus cam_status = mega.begin();
+  //CamStatus cam_status = CAM_ERR_SUCCESS;
+  if (cam_status != CAM_ERR_SUCCESS) {
+    log(F("Arducam Mega failed to start!"), DEBUG_ERR);
+  } else {
+    log(F("Mega started!"), DEBUG_INFO);
 
-  // initialize the SD Card
-  while (!SD.begin(SD_CS)) {
-    log(F("SD Card Error!"), DEBUG_ERR);
-    delay(1000);
-  }
-  log(F("SD Card detected."), DEBUG_INFO);
+    // initialize the SD Card
+    while (!SD.begin(SD_CS)) {
+      log(F("SD Card Error!"), DEBUG_ERR);
+      delay(1000);
+    }
+    log(F("SD Card detected."), DEBUG_INFO);
+  }  
 }
 
  
@@ -142,7 +147,7 @@ void loop() {
   }  
 }
 
-void handleAmbientLightDetection() {
+void handleAmbientLightDetection() {  
   // if our pd readings haven't reached the threshold needed to trigger a photograph...
   if (pd_threshold_counter < pd_threshold && shouldReadAmbientLight()) {
     // take another reading (at defined interval) and update...
@@ -168,6 +173,7 @@ void takeAndSavePicture() {
   if (!picture_taken) {
     log(F("Smile! You're on candid camera!"), DEBUG_INFO);
     // CAM_IMAGE_MODE_QVGA is 320x240
+    // CAM_IMAGE_MODE_WQXGA2 is 2592x1944    
     mega.takePicture(CAM_IMAGE_MODE_QVGA, CAM_IMAGE_PIX_FMT_JPG);
     picture_taken = true;
   } else {
