@@ -1,3 +1,32 @@
+/**
+* retropix.ino
+*
+* Main program file for the RetroPix vintage camera to digital conversion project.
+*
+* Description:
+* This Arduino sketch controls the RetroPix retrofit system, which captures digital photographs using an Arducam Mega 5MP camera mounted inside a vintage medium format camera housing. 
+* The program manages camera initialization, image capture triggered by ambient light detection through a photodiode sensor, and storage of captured images to a microSD card.
+*
+* Major Functions:
+* - Initialize the camera, microSD card, and light detection sensor
+* - Detect when the camera shutter opens via a photodiode signal
+* - Capture and save an image when triggered
+* - Manage image data transfer and buffering to avoid data loss
+* - Log status messages for debugging and diagnostics
+*
+* Hardware:
+* - Arduino Uno R3
+* - Arducam Mega 5MP SPI Camera
+* - Photodiode light sensor
+* - MicroSD card module (or integrated with Arducam)
+* - 9V battery power source
+*
+* Team 1: Matt Caldwell, Mary Jasper, Aislinn Powell
+* Class: EGR 122 - Engineering Design with Professor Gill
+* Institution/Semester: J. Sargeant Reynolds Community College, Spring 2025
+* Final Submission: 4/29/2025
+*/
+
 // Arducam MEGA Reference Links::
 // Getting Started: https://www.arducam.com/docs/arducam-mega/arducam-mega-getting-started/
 // Arduino UNO R3 Details: https://www.arducam.com/docs/arducam-mega/arducam-mega-getting-started/packs/example/ArduinoUNOR3.html
